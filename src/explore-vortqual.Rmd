@@ -1,0 +1,89 @@
+---
+title: "Vorticity and Rorquals (vortqual)"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup}
+library(tidyverse)
+library(moveHMM)
+library(sf)
+# Set root directory to project root
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+```
+
+```{r data}
+load("data/diveDiv.RData")
+load("data/VorticityStack.RData")
+```
+
+Look at the dives
+```{r see_dives}
+ggplot(diveDiv, aes(Lon, Lat, color = VatT)) +
+  geom_point(aes(size = LungeCount)) +
+  geom_path() +
+  scale_color_gradient2(low = "red", high = "blue") +
+  theme_minimal()
+```
+
+Bucket by hour
+```{r hourly_dives}
+hourly_dives <- diveDiv %>% 
+  mutate(ID = "bw1",
+         hour = floor(as.numeric(dtStart - min(dtStart), units = "hours"))) %>% 
+  group_by(ID, hour) %>% 
+  summarize(lon = mean(Lon, na.rm = TRUE),
+            lat = mean(Lat, na.rm = TRUE),
+            vort = mean(VatT, na.rm = TRUE),
+            lunges = sum(LungeCount, na.rm = TRUE)) %>% 
+  ungroup %>% 
+  filter(!is.nan(lon),
+         !is.nan(lat)) %>% 
+  as.data.frame() %>% 
+  mutate(state = case_when(lunges == 0 ~ 1,
+                           lunges <= 15 ~ 2,
+                           lunges > 15 ~ 3))
+
+ggplot(hourly_dives, aes(lon, lat, color = vort)) +
+  geom_path() +
+  geom_point(aes(shape = factor(state))) +
+  scale_color_gradient2(low = "red", high = "blue") +
+  theme_minimal()
+```
+
+Fit HMM
+```{r fit_hmm}
+# Prepare data
+dives_prepped <- prepData(hourly_dives, type = "LL", coordNames = c("lon", "lat"))
+
+# Summarize prepared data
+summary(dives_prepped)
+
+# Fit HMM
+## Initial parameters (known states are based on # lunges)
+step_pars <- dives_prepped %>% 
+  group_by(state) %>% 
+  summarize(mu0 = mean(step, na.rm = TRUE),
+            sigma0 = sd(step, na.rm = TRUE))
+step_par0 <- c(step_pars$mu0, step_pars$mu0)
+angle_par0 <- c(c(0, 0, pi), c(1, 1, 1))
+## Just step and angle
+dive_hmm0 <- fitHMM(dives_prepped,
+                    nbStates = 3,
+                    stepPar0 = step_par0,
+                    anglePar0 = angle_par0,
+                    knownStates = dives_prepped$state)
+## Step, angle, and 
+dive_hmm_vort <- fitHMM(dives_prepped,
+                        nbStates = 3,
+                        stepPar0 = step_par0,
+                        anglePar0 = angle_par0,
+                        formula = ~ vort,
+                        knownStates = dives_prepped$state)
+```
+
+Plot HMM
+```{r plot_hmm}
+plot(dive_hmm_vort, ask = FALSE, plotTracks = FALSE)
+```
