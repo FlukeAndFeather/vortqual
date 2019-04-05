@@ -36,18 +36,22 @@ hourly_dives <- diveDiv %>%
   summarize(lon = mean(Lon, na.rm = TRUE),
             lat = mean(Lat, na.rm = TRUE),
             vort = mean(VatT, na.rm = TRUE),
-            lunges = sum(LungeCount, na.rm = TRUE)) %>% 
+            lunges = sum(LungeCount, na.rm = TRUE),
+            lungeDepth = mean(meanLungeDepth,na.rm= TRUE)) %>% #View()
   ungroup %>% 
   filter(!is.nan(lon),
          !is.nan(lat)) %>% 
   as.data.frame() %>% 
-  mutate(state = case_when(lunges == 0 ~ 1,
-                           lunges <= 15 ~ 2,
-                           lunges > 15 ~ 3))
+  mutate(stateLungeIntensity = case_when(lunges == 0 ~ 1,
+                                    lunges <= 15 ~ 2,
+                                    lunges > 15 ~ 3),
+         stateLungeDepth = case_when(is.nan(lungeDepth) ~ 1,
+                                lungeDepth <= 50 ~ 2,
+                                lungeDepth > 50 ~ 3))
 
 ggplot(hourly_dives, aes(lon, lat, color = vort)) +
   geom_path() +
-  geom_point(aes(shape = factor(state))) +
+  geom_point(aes(shape = factor(stateLungeDepth))) +
   scale_color_gradient2(low = "red", high = "blue") +
   theme_minimal()
 ```
@@ -63,27 +67,33 @@ summary(dives_prepped)
 # Fit HMM
 ## Initial parameters (known states are based on # lunges)
 step_pars <- dives_prepped %>% 
-  group_by(state) %>% 
+  group_by(stateLungeDepth) %>% 
   summarize(mu0 = mean(step, na.rm = TRUE),
             sigma0 = sd(step, na.rm = TRUE))
 step_par0 <- c(step_pars$mu0, step_pars$mu0)
 angle_par0 <- c(c(0, 0, pi), c(1, 1, 1))
-## Just step and angle
-dive_hmm0 <- fitHMM(dives_prepped,
-                    nbStates = 3,
-                    stepPar0 = step_par0,
-                    anglePar0 = angle_par0,
-                    knownStates = dives_prepped$state)
-## Step, angle, and 
-dive_hmm_vort <- fitHMM(dives_prepped,
+## Foraging intensity ~ Vorticity 
+dive_hmm_intensity_vort <- fitHMM(dives_prepped,
                         nbStates = 3,
                         stepPar0 = step_par0,
                         anglePar0 = angle_par0,
                         formula = ~ vort,
-                        knownStates = dives_prepped$state)
+                        knownStates = dives_prepped$stateLungeIntensity)
+## Foraging Depth ~ Vorticity 
+dive_hmm_depth_vort <- fitHMM(dives_prepped,
+                        nbStates = 3,
+                        stepPar0 = step_par0,
+                        anglePar0 = angle_par0,
+                        formula = ~ vort,
+                        knownStates = dives_prepped$stateLungeDepth)
+
+
 ```
 
 Plot HMM
 ```{r plot_hmm}
-plot(dive_hmm_vort, ask = FALSE, plotTracks = FALSE)
+plot(dive_hmm_intensity_vort, ask = FALSE, plotTracks = TRUE)
+
+plot(dive_hmm_depth_vort, ask = FALSE, plotTracks = TRUE)
+
 ```
