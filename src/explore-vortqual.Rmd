@@ -14,13 +14,13 @@ knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 ```
 
 ```{r data}
-load("data/diveDiv.RData")
-load("data/VorticityStack.RData")
+load("data/Bm181021-TDR14_diveDiv.RData")
+load("data/Bm181021-TDR14_VorticityStack.RData")
 ```
 
 Look at the dives
 ```{r see_dives}
-ggplot(diveDiv, aes(Lon, Lat, color = VatT)) +
+ggplot(diveDiv[!is.na(diveDiv$VatT),], aes(Lon, Lat, color = VatT)) +
   geom_point(aes(size = LungeCount)) +
   geom_path() +
   scale_color_gradient2(low = "red", high = "blue") +
