@@ -54,6 +54,12 @@ ggplot(hourly_dives, aes(lon, lat, color = vort)) +
   geom_point(aes(shape = factor(stateLungeDepth))) +
   scale_color_gradient2(low = "red", high = "blue") +
   theme_minimal()
+ggplot(hourly_dives, aes(lon, lat, color = vort)) +
+  geom_path() +
+  geom_point(aes(shape = factor(stateLungeIntensity))) +
+  scale_color_gradient2(low = "red", high = "blue") +
+  theme_minimal()
+
 ```
 
 Fit HMM
@@ -92,8 +98,9 @@ dive_hmm_depth_vort <- fitHMM(dives_prepped,
 
 Plot HMM
 ```{r plot_hmm}
+#Foraging Intensity ~ Vorticity (0, < 15 Lunges/hr, >15m Lunges/hr)
 plot(dive_hmm_intensity_vort, ask = FALSE, plotTracks = TRUE)
-
+#Foraging Depth ~ Vorticity (0, < 50m, >50m)
 plot(dive_hmm_depth_vort, ask = FALSE, plotTracks = TRUE)
 
 ```
