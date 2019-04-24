@@ -71,25 +71,41 @@ dives_prepped <- prepData(hourly_dives, type = "LL", coordNames = c("lon", "lat"
 summary(dives_prepped)
 
 # Fit HMM
+
+## Lunge Intensity
 ## Initial parameters (known states are based on # lunges)
-step_pars <- dives_prepped %>% 
-  group_by(stateLungeDepth) %>% 
+step_parsLI <- dives_prepped %>% 
+  group_by(stateLungeIntensity) %>% 
   summarize(mu0 = mean(step, na.rm = TRUE),
             sigma0 = sd(step, na.rm = TRUE))
-step_par0 <- c(step_pars$mu0, step_pars$mu0)
-angle_par0 <- c(c(0, 0, pi), c(1, 1, 1))
+
+step_par0LI <- c(step_parsLI$mu0, step_parsLI$mu0)
+angle_par0LI <- c(c(0, 0, pi), c(1, 1, 1))
 ## Foraging intensity ~ Vorticity 
 dive_hmm_intensity_vort <- fitHMM(dives_prepped,
                         nbStates = 3,
-                        stepPar0 = step_par0,
-                        anglePar0 = angle_par0,
+                        stepPar0 = step_par0LI,
+                        anglePar0 = angle_par0LI,
                         formula = ~ vort,
                         knownStates = dives_prepped$stateLungeIntensity)
+
+
+## Lunge Depth 
+## Initial parameters (known states are based on # lunges)
+step_parsLD <- dives_prepped %>%
+  group_by(stateLungeDepth) %>%
+  summarize(
+            mu0 = mean(step, na.rm = TRUE),
+            sigma0 = sd(step, na.rm = TRUE))
+step_parsLD<- add_row(step_parsLD,stateLungeDepth=2,mu0=1,sigma0=1, .before = 3)
+step_par0LD <- c(step_parsLD$mu0, step_parsLD$mu0)
+angle_par0LD <- c(c(0, 0, pi), c(1, 1, 1))
+
 ## Foraging Depth ~ Vorticity 
 dive_hmm_depth_vort <- fitHMM(dives_prepped,
                         nbStates = 3,
-                        stepPar0 = step_par0,
-                        anglePar0 = angle_par0,
+                        stepPar0 = step_par0LD,
+                        anglePar0 = angle_par0LD,
                         formula = ~ vort,
                         knownStates = dives_prepped$stateLungeDepth)
 
