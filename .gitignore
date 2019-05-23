@@ -1,6 +1,6 @@
 .DS_store
 .Rproj.user
 .Rhistory
-.RData
+#.RData
 .Ruserdata
-data/
+#data/

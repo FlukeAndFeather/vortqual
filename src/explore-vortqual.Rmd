@@ -20,7 +20,7 @@ load("data/Bm181021-TDR14_VorticityStack.RData")
 
 Look at the dives
 ```{r see_dives}
-ggplot(diveDiv[!is.na(diveDiv$VatT),], aes(Lon, Lat, color = VatT)) +
+ggplot(diveDiv[!is.na(diveDiv$VatT),], aes(Long, Lat, color = VatT)) +
   geom_point(aes(size = LungeCount)) +
   geom_path() +
   scale_color_gradient2(low = "red", high = "blue") +
@@ -30,12 +30,14 @@ ggplot(diveDiv[!is.na(diveDiv$VatT),], aes(Lon, Lat, color = VatT)) +
 Bucket by hour
 ```{r hourly_dives}
 hourly_dives <- diveDiv %>% 
+  filter(!is.na(VatT)) %>% 
   mutate(ID = "bw1",
          hour = floor(as.numeric(dtStart - min(dtStart), units = "hours"))) %>% 
   group_by(ID, hour) %>% 
-  summarize(lon = mean(Lon, na.rm = TRUE),
+  summarize(lon = mean(Long, na.rm = TRUE),
             lat = mean(Lat, na.rm = TRUE),
             vort = mean(VatT, na.rm = TRUE),
+            vortSSD = mean(VorticitySSD, na.rm = TRUE),
             lunges = sum(LungeCount, na.rm = TRUE),
             lungeDepth = mean(meanLungeDepth,na.rm= TRUE)) %>% #View()
   ungroup %>% 
@@ -43,11 +45,20 @@ hourly_dives <- diveDiv %>%
          !is.nan(lat)) %>% 
   as.data.frame() %>% 
   mutate(stateLungeIntensity = case_when(lunges == 0 ~ 1,
-                                    lunges <= 15 ~ 2,
+                                    lunges >0 & lunges <= 15 ~ 2,
+                                    lunges > 15 ~ 3),
+         stateLungeIntensity2 = case_when(lunges <= 5 ~ 1,
+                                    lunges >5 & lunges <= 15 ~ 2,
                                     lunges > 15 ~ 3),
          stateLungeDepth = case_when(is.nan(lungeDepth) ~ 1,
                                 lungeDepth <= 50 ~ 2,
                                 lungeDepth > 50 ~ 3))
+LChist <- histogram(hourly_dives$lunges, 
+          main = "Distribution of Hourly Lunge Counts",
+          breaks = seq(0,50, by = .5),
+          xlab = "Lunge Count per Hour", na.rm = TRUE)
+LChist
+
 
 ggplot(hourly_dives, aes(lon, lat, color = vort)) +
   geom_path() +
@@ -88,7 +99,13 @@ dive_hmm_intensity_vort <- fitHMM(dives_prepped,
                         anglePar0 = angle_par0LI,
                         formula = ~ vort,
                         knownStates = dives_prepped$stateLungeIntensity)
-
+## Foraging intensity ~ VorticitySSD 
+dive_hmm_intensity_vortSSD <- fitHMM(dives_prepped,
+                        nbStates = 3,
+                        stepPar0 = step_par0LI,
+                        anglePar0 = angle_par0LI,
+                        formula = ~ vortSSD, #+ vort,
+                        knownStates = dives_prepped$stateLungeIntensity)
 
 ## Lunge Depth 
 ## Initial parameters (known states are based on # lunges)
@@ -116,6 +133,9 @@ Plot HMM
 ```{r plot_hmm}
 #Foraging Intensity ~ Vorticity (0, < 15 Lunges/hr, >15m Lunges/hr)
 plot(dive_hmm_intensity_vort, ask = FALSE, plotTracks = TRUE)
+#Foraging Intensity ~ VorticitySSD (0, < 15 Lunges/hr, >15m Lunges/hr)
+plot(dive_hmm_intensity_vortSSD, ask = FALSE, plotTracks = FALSE)
+
 #Foraging Depth ~ Vorticity (0, < 50m, >50m)
 plot(dive_hmm_depth_vort, ask = FALSE, plotTracks = TRUE)
 
